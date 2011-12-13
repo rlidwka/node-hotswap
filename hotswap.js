@@ -33,8 +33,6 @@ var timeouts = [100, 300, 1000];
 // it's for events generation
 var emitter = new Events.EventEmitter();
 
-var reloading_hotswap = 0;
-
 // register new extension for hotswapping
 function register_extension(ext)
 {
@@ -105,6 +103,15 @@ function require_force(name)
 	return require_file(require.resolve(name));
 }
 
+function try_require_file(filename)
+{
+	try {
+		require(filename);
+	} catch(err) {
+		emitter.emit('error', err);
+	}
+}
+
 // require specified file with our handler
 function require_file(filename)
 {
@@ -135,6 +142,7 @@ function copy_object(dest, src)
 			dest[k] = src[k];
 		}
 	}
+	dest.prototype = src.prototype;
 }
 
 function new_code(filename, newmodule)
@@ -176,7 +184,7 @@ function change_code(filename, oldmodule, newmodule)
 
 	copy_object(actual, newexp);
 	if (typeof(newmodule.change_code) == 'function') {
-		newmodule.change_code(oldmodule, newmodule);
+		newmodule.change_code(oldmodule, newmodule, actual);
 	}
 
 	// exporting an old hash actually
@@ -186,22 +194,27 @@ function change_code(filename, oldmodule, newmodule)
 // it is require.extension[...] handler
 function extension_js(module, filename)
 {
-	var is_hotswap_file = reloading_hotswap;
+	var is_hotswap_file = false;
 	var content = get_file_contents(filename);
 	delete fscache[filename];
 	var iscompiled = false;
+	
+	fs.stat(filename, function(err, stats) {
+		hotswap[filename] = stats.mtime;
+	});
+
 	//var oldmodule = require.cache[filename];
-	try {
-		module._compile(content, filename);
-		iscompiled = true;
-	} catch(err) {
-		emitter.emit('error', err);
-	}
+	//try {
+	module._compile(content, filename);
+	iscompiled = true;
+	//} catch(err) {
+	//	emitter.emit('error', err);
+	//}
 
 	if (iscompiled) {
 		var oldmodule = loaded_mods[filename];
 		var newmodule = require.cache[filename];
-		is_hotswap_file = is_hotswap_file || !!newmodule.change_code;
+		is_hotswap_file = !!newmodule.change_code;
 		if (!is_hotswap_file) return;
 
 		if (typeof(newmodule.exports) != 'object' && typeof(newmodule.exports) != 'function') {
@@ -217,14 +230,8 @@ function extension_js(module, filename)
 		loaded_mods[filename] = newmodule;
 	}
 
-	if (is_hotswap_file) {
-		if (watchfiles && !watchfilenames[filename]) {
-			watch_file(filename);
-		}
-
-		fs.stat(filename, function(err, stats) {
-			hotswap[filename] = stats.mtime;
-		});
+	if (is_hotswap_file && watchfiles && !watchfilenames[filename]) {
+		watch_file(filename);
 	}
 }
 
@@ -254,9 +261,7 @@ function reload_file_force(filename, ntry)
 	read_file_failsafe(filename, function (data) {
 		fscache[filename] = data;
 		delete require.cache[filename];
-		reloading_hotswap = 1;
-		require_file(filename);
-		reloading_hotswap = 0;
+		try_require_file(filename);
 	});
 }
 
@@ -277,9 +282,7 @@ function reload(cb)
 	}, function(results) {
 		results.forEach(function(file) {
 			delete require.cache[file];
-			reloading_hotswap = 1;
-			require_file(file);
-			reloading_hotswap = 0;
+			try_require_file(file);
 		});
 		if (cb) cb(results);
 	});
@@ -293,14 +296,14 @@ function extensions(list)
 
 	if (typeof(list) == "string") 
 		return extensions.call(this, arguments);
-
+	
 	var _extensions_copy = {};
 	for (var arg in current_extensions) {
 		_extensions_copy[arg] = 1;
 	}
 
-	for (var i=0; i<arguments.length; i++) {
-		var arg = arguments[i];
+	for (var i=0; i<arguments[0].length; i++) {
+		var arg = arguments[0][i];
 		if (!_extensions_copy[arg]) {
 			register_extension(arg);
 		}
@@ -375,7 +378,7 @@ function configure(hash)
 
 // this is configuration by default
 configure({
-	extensions: ['.jsh'],
+	extensions: ['.js'],
 	watch: true,
 	autoreload: true,
 });
