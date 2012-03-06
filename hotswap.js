@@ -34,7 +34,7 @@ var timeouts = [100, 300, 1000];
 var emitter = new Events.EventEmitter();
 
 // register new extension for hotswapping
-function register_extension(ext)
+function register_extension(ext, type)
 {
 	if (current_extensions[ext]) return;
 
@@ -43,8 +43,8 @@ function register_extension(ext)
 		original_handlers[ext] = require.extensions[ext];
 	}
 
-	require.extensions[ext] = extension_js;
-	current_extensions[ext] = 1;
+	require.extensions[ext] = extension_js.bind(this, type);
+	current_extensions[ext] = type;
 }
 
 // restore original handler for extension
@@ -116,9 +116,10 @@ function try_require_file(filename)
 function require_file(filename)
 {
 	var ext = path.extname(filename) || '.js';
+	var type = ext == '.coffee' ? 'coffee' : 'js';
 	var reg_required = !current_extensions[ext];
 	var result;
-	if (reg_required) register_extension(ext);
+	if (reg_required) register_extension(ext, type);
 	try {
 		result = require(filename);
 	} finally {
@@ -192,7 +193,7 @@ function change_code(filename, oldmodule, newmodule)
 }
 
 // it is require.extension[...] handler
-function extension_js(module, filename)
+function extension_js(type, module, filename)
 {
 	var is_hotswap_file = false;
 	var content = get_file_contents(filename);
@@ -203,32 +204,31 @@ function extension_js(module, filename)
 		hotswap[filename] = stats.mtime;
 	});
 
-	//var oldmodule = require.cache[filename];
-	//try {
-	module._compile(content, filename);
-	iscompiled = true;
-	//} catch(err) {
-	//	emitter.emit('error', err);
-	//}
-
-	if (iscompiled) {
-		var oldmodule = loaded_mods[filename];
-		var newmodule = require.cache[filename];
-		is_hotswap_file = !!newmodule.change_code;
-		if (!is_hotswap_file) return;
-
-		if (typeof(newmodule.exports) != 'object' && typeof(newmodule.exports) != 'function') {
-			emitter.emit('error', new Error("hotswap cannot work with module "+filename));
-		} else {
-			if (oldmodule === undefined) {
-				new_code(filename, newmodule);
-			} else {
-				change_code(filename, oldmodule, newmodule);
-				emitter.emit('swap', filename);
-			}
-		}
-		loaded_mods[filename] = newmodule;
+	if (type == 'coffee') {
+		var compiled = require('coffee-script').compile(content, {
+			filename: filename
+		});
+		module._compile(compiled, filename);
+	} else {
+		module._compile(content, filename);
 	}
+
+	var oldmodule = loaded_mods[filename];
+	var newmodule = require.cache[filename];
+	is_hotswap_file = !!newmodule.change_code;
+	if (!is_hotswap_file) return;
+
+	if (typeof(newmodule.exports) != 'object' && typeof(newmodule.exports) != 'function') {
+		emitter.emit('error', new Error("hotswap cannot work with module "+filename));
+	} else {
+		if (oldmodule === undefined) {
+			new_code(filename, newmodule);
+		} else {
+			change_code(filename, oldmodule, newmodule);
+			emitter.emit('swap', filename);
+		}
+	}
+	loaded_mods[filename] = newmodule;
 
 	if (is_hotswap_file && watchfiles && !watchfilenames[filename]) {
 		watch_file(filename);
@@ -291,21 +291,39 @@ function reload(cb)
 // change extension list and return new list
 function extensions(list)
 {
-	if (list === undefined) 
-		return Object.keys(current_extensions);
+	if (list === undefined) {
+		var res = {};
+		for (var i in current_extensions) res[i] = current_extensions[i];
+		return res;
+	}
 
-	if (typeof(list) == "string") 
-		return extensions.call(this, arguments);
+	if (typeof(list) == "string") {
+		var hash = {};
+		hash[list] = 'js';
+		return extensions.call(this, hash);
+	}
+
+	if (typeof(list) != "object") throw new Error('type error');
+	if (list instanceof Array) {
+		var hash = {};
+		list.forEach(function(x) {
+			hash[x] = 'js';
+		});
+		return extensions.call(this, hash);
+	}
 	
 	var _extensions_copy = {};
 	for (var arg in current_extensions) {
-		_extensions_copy[arg] = 1;
+		_extensions_copy[arg] = current_extensions[arg];
 	}
 
-	for (var i=0; i<arguments[0].length; i++) {
-		var arg = arguments[0][i];
+	for (var arg in list) {
+		if (_extensions_copy[arg] != list[arg]) {
+			restore_extension(arg);
+			delete _extensions_copy[arg];
+		}
 		if (!_extensions_copy[arg]) {
-			register_extension(arg);
+			register_extension(arg, list[arg]);
 		}
 		delete _extensions_copy[arg];
 	}
@@ -316,7 +334,9 @@ function extensions(list)
 		}
 	}
 
-	return Object.keys(current_extensions);
+	var res = {};
+	for (var i in current_extensions) res[i] = current_extensions[i];
+	return res;
 }
 
 // here should be function to trigger code changing
@@ -378,7 +398,7 @@ function configure(hash)
 
 // this is configuration by default
 configure({
-	extensions: ['.js'],
+	extensions: {'.js': 'js', '.coffee': 'coffee'},
 	watch: true,
 	autoreload: true,
 });
