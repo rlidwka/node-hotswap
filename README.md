@@ -20,6 +20,15 @@ This module overrides default functions in require.extension and do some magic t
 to exports objects of modules with defined `module.change_code`. And when module is changed 
 contents of it's old exports object is replaced with contents of the new one.
 
+```javascript
+// So, this will work fine, m will be changed:
+var m = require('hot-swapping-module');
+
+// but "hotswap" have to way to replace m.func with new value
+// so dont do this unless you really want to use old code, 
+var m.func = require('hot-swapping-module').func;
+```
+
 ## Local variables
 
 When old module is replaced by the new one, local variables of the old module will be lost. 
