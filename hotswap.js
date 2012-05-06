@@ -215,6 +215,9 @@ function extension_js(type, module, filename)
 
 	var oldmodule = loaded_mods[filename];
 	var newmodule = require.cache[filename];
+	// require('repl').start() resets require.cache?
+	if (typeof(newmodule) !== 'object') return;
+
 	is_hotswap_file = !!newmodule.change_code;
 	if (!is_hotswap_file) return;
 
