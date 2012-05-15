@@ -1,0 +1,19 @@
+{
+  "author": "Alex Kocharin (rlidwka)",
+  "name": "hotswap",
+  "description": "Code hotswapping for your node.js modules",
+  "version": "1.0.0",
+  "homepage": "https://github.com/rlidwka/node-hotswap",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/rlidwka/node-hotswap.git"
+  },
+  "main": "./hotswap",
+  "engines": {
+    "node": "*"
+  },
+  "dependencies": {
+    "async": "*"
+  },
+  "devDependencies": {}
+}
