@@ -146,7 +146,11 @@ function copy_object(dest, src)
 			dest[k] = src[k];
 		}
 	}
-	dest.prototype = src.prototype;
+	if (src.prototype != undefined) {
+		dest.prototype = src.prototype;
+	} else {
+		delete dest.prototype;
+	}
 }
 
 function new_code(filename, newmodule)
