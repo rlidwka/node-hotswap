@@ -63,7 +63,10 @@ function restore_extension(ext)
 
 function read_file_failsafe(filename, cb)
 {
-	fs.unwatchFile(filename);
+	if (watchfilenames[filename]) {
+		watchfilenames[filename].close();
+		delete watchfilenames[filename];
+	}
 	try_read_file(filename, function(err, data) {
 		watch_file(filename);
 		if (err) {
@@ -345,20 +348,20 @@ function extensions(list)
 // here should be function to trigger code changing
 function watch_file(filename)
 {
-	fs.watchFile(filename, function() {
+	var w = fs.watch(filename, function() {
 		emitter.emit('change', filename);
 		if (autoreload) {
 			reload_file_force(filename);
 		}
 	});
-	watchfilenames[filename] = 1;
+	watchfilenames[filename] = w;
 }
 
 // unwatch all loaded modules
 function unwatch_all()
 {
 	for (var mod in watchfilenames) {
-		fs.unwatchFile(mod);
+		watchfilenames[mod].close();
 	}
 	watchfilenames = {};
 	watchfiles = false;
