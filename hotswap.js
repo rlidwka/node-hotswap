@@ -352,7 +352,7 @@ function extensions(list)
 // here should be function to trigger code changing
 function watch_file(filename)
 {
-	var w = fs.watch(filename, function() {
+	var w = fs.watch(filename, {persistent: false}, function() {
 		emitter.emit('change', filename);
 		if (autoreload) {
 			reload_file_force(filename);
