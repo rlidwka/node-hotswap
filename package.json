@@ -1,14 +1,14 @@
 {
-  "author": "Alex Kocharin (rlidwka)",
-  "name": "hotswap",
+  "author": "elsehow",
+  "name": "hotmop",
   "description": "Code hotswapping for your node.js modules",
-  "version": "1.1.0",
-  "homepage": "https://github.com/rlidwka/node-hotswap",
+  "version": "0.0.1",
+  "homepage": "https://github.com/elsehow/hotmop",
   "repository": {
     "type": "git",
-    "url": "git://github.com/rlidwka/node-hotswap.git"
+    "url": "git://github.com/elsehow/hotmop"
   },
-  "main": "./hotswap",
+  "main": "./hotmop",
   "engines": {
     "node": "*"
   },

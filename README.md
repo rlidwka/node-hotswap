@@ -1,96 +1,48 @@
-## Basic usage
+## installation
 
-Just write this in your main file (or in the repl):
+    npm install hotmop
 
-```javascript
-require('hotswap');
-```
-
-And then add this line to modules you want to be reloaded (it tells *node-hotswap* to watch this file):
+## usage
 
 ```javascript
-module.change_code = 1;
+var swapEmitter = require('hotmop')('/home/elsehow/myproj/myModule.js')
+var myCoolModule = require('./myModule.js')
+
+swapEmitter.on('swap', function () {
+  console.log('myModule.js just got hot-swapped!')
+})
+
+swapEmitter.on('error', function (err) {
+  console.log('error on require!', err)
+})
+
 ```
 
-Now if you change your modules, they will be reloaded automatically.
+If you change that myModule.js file and save your changes, the modulek, it will be automatically reloaded!
 
-Demo (you have to wait more than 1 second between writings - it's file system limitations):
-```javascript
+As an added bonus, the file with [automatically be checked for syntax errors](https://www.npmjs.com/package/syntax-error), which will bubble up through the emitter's 'error' event.
 
-var fs = require('fs');
-var hotswap = require('hotswap');
+**NOTE: this has NOT been tested to work with multiple files!! try that at your own risk. and do a PR if you fix it!**
 
-// writing the initial version of test.js
-fs.writeFileSync("hotswap-test.js", "module.exports.version = 0; module.change_code = true;");
+## api
 
-// requiring it
-var test = require('./hotswap-test')
-console.log(test);
+### hotmop(absolutePath)
 
-hotswap.on('swap', function() {
-        // we are going to console.log(test) whenever it's changed
-        console.log(test);
-});
+this function overrides require
 
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports.version = 1; module.change_code = true;")
-}, 1000);
-
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports.hi_there = function(){}; module.change_code = true;")
-}, 2000);
-
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports = {wow: 'thats working'}; module.change_code = true;")
-}, 3000);
-
-/* outputs:
- * { version: 0 }
- * { version: 1 }
- * { hi_there: [Function] }
- * { wow: 'thats working' }
- */
-```
-
-## What does it do?
-
-This module overrides default functions in require.extension and do some magic there. It remembers all references to `exports` objects of modules with function `module.change_code` defined. When module is changed, contents of it's old exports object is replaced with contents of the new one.
-
-```javascript
-// So, this will work fine, m will be changed:
-var m = require('hot-swapping-module');
-
-// but "hotswap" have to way to replace m.func with new value
-// so dont do this unless you really want to use old code, 
-var m.func = require('hot-swapping-module').func;
-```
+The value that require('hotmop') returns will be an event emitter.
 
 ## Events
 
-`require('hotswap')` returns an EventEmitter that emits the following events:
+`require('hotmop')(pathToFile)` returns an EventEmitter that emits the following events:
 
-- `change` - when one of the watched modules has changed
-- `swap` - after successful replacing an old module with a new version
+- `change` - when the watched module has changed
+- `swap` - after successfully replacing an old module with a new version
 - `error` - if there was a filesystem error or something like that
-
-## Local variables
-
-When old module is replaced by the new one, local variables of the old module will be lost. 
-If you want to save them, you can use `module.change_code`.
-
-If `module.change_code` is defined as a function it will be called before module is reloaded. So you can write up something like that:
-
-```javascript
-module.cache = {} // it's important data you want to save
-
-module.change_code = function(oldmod, newmod, exports_object) {
-  newmod.cache = oldmod.cache;
-}
-```
 
 ## Configuration
 
-You can configure `node-hotswap` using `configure` function. 
+You can configure `hotmop` using `configure` function. 
 
 ```javascript
 require('hotswap').configure({
@@ -112,7 +64,3 @@ require('hotswap').configure({
 	autoreload: true,
 });
 ```
-
-## Todo
-
-I should really write up some good documentation and examples here -_-
