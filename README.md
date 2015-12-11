@@ -1,118 +1,54 @@
-## Basic usage
+# hotmop
 
-Just write this in your main file (or in the repl):
+hot-reload your node modules
 
-```javascript
-require('hotswap');
-```
+emits 'error' on syntax errors
 
-And then add this line to modules you want to be reloaded (it tells *node-hotswap* to watch this file):
+## installation
 
-```javascript
-module.change_code = 1;
-```
+    npm install hotmop
 
-Now if you change your modules, they will be reloaded automatically.
+## usage
 
-Demo (you have to wait more than 1 second between writings - it's file system limitations):
-```javascript
-
-var fs = require('fs');
-var hotswap = require('hotswap');
-
-// writing the initial version of test.js
-fs.writeFileSync("hotswap-test.js", "module.exports.version = 0; module.change_code = true;");
-
-// requiring it
-var test = require('./hotswap-test')
-console.log(test);
-
-hotswap.on('swap', function() {
-        // we are going to console.log(test) whenever it's changed
-        console.log(test);
-});
-
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports.version = 1; module.change_code = true;")
-}, 1000);
-
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports.hi_there = function(){}; module.change_code = true;")
-}, 2000);
-
-setTimeout(function() {
-        fs.writeFile("hotswap-test.js", "module.exports = {wow: 'thats working'}; module.change_code = true;")
-}, 3000);
-
-/* outputs:
- * { version: 0 }
- * { version: 1 }
- * { hi_there: [Function] }
- * { wow: 'thats working' }
- */
-```
-
-## What does it do?
-
-This module overrides default functions in require.extension and do some magic there. It remembers all references to `exports` objects of modules with function `module.change_code` defined. When module is changed, contents of it's old exports object is replaced with contents of the new one.
+in myModule.js
 
 ```javascript
-// So, this will work fine, m will be changed:
-var m = require('hot-swapping-module');
-
-// but "hotswap" have to way to replace m.func with new value
-// so dont do this unless you really want to use old code, 
-var m.func = require('hot-swapping-module').func;
-```
-
-## Events
-
-`require('hotswap')` returns an EventEmitter that emits the following events:
-
-- `change` - when one of the watched modules has changed
-- `swap` - after successful replacing an old module with a new version
-- `error` - if there was a filesystem error or something like that
-
-## Local variables
-
-When old module is replaced by the new one, local variables of the old module will be lost. 
-If you want to save them, you can use `module.change_code`.
-
-If `module.change_code` is defined as a function it will be called before module is reloaded. So you can write up something like that:
-
-```javascript
-module.cache = {} // it's important data you want to save
-
-module.change_code = function(oldmod, newmod, exports_object) {
-  newmod.cache = oldmod.cache;
+module.exports = {
+  stuff: 'nice',
+  moreStuff: 'nice',
 }
 ```
 
-## Configuration
-
-You can configure `node-hotswap` using `configure` function. 
+in main.js
 
 ```javascript
-require('hotswap').configure({
-	// a list of extensions registered by hotswap
-	//
-	// you can define your own extension for such files if you are afraid 
-	// that this module would mess up with some other modules (shouldn't 
-	// happen though)
-    //
-	// default: {'.js': 'js', '.coffee': 'coffee'}
-	extensions: {'.js': ['js', 'jsx'], '.coffee': 'coffee'},
+var hotmop = require('hotmop')
+var myCoolModule = require('./myModule1.js')
 
-	// enable or disable fs.watch() on hotswapping files
-	// default: true
-	watch: true,
+var f = __dirname + '/myModule.js'
+var swapper = hotmop(f)
 
-	// automatically reload files on change
-	// default: true
-	autoreload: true,
-});
+swapper.on('swap', function (newModule) {
+  myCoolModule = newModule
+  console.log('swapped module!', myCoolModule)
+})
+
+swapper.on('error', function (err) {
+  console.log('error in first module!', err)
+})
+
 ```
+## api
 
-## Todo
+### hotmop(absolutePath)
 
-I should really write up some good documentation and examples here -_-
+returns an event emitter.
+
+## emitter events
+
+- `swap` - when a watched module has changed
+- `error` - if there was a filesystem error or syntax error
+
+## license
+
+BSD-2-Clause
